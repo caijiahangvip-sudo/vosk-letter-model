@@ -858,7 +858,7 @@ for(const id of ['list','pos','category'])$(id).onchange=()=>{if(id==='list'){$(
 function isUsageNote(x){return /^[（(][^（()）]*[）)]$/.test((x.meaning||'').trim())&&!/^(后缀|前缀)$/.test(x.pos)}
 function canPractice(x){return !!x && /[\u3400-\u9fff]/u.test(x.meaning||'') && !/待核对|待补充|暂无释义/.test(x.meaning) && !isUsageNote(x)}
 function start(ids,kind='practice'){const requested=ids.length;ids=ids.filter(id=>canPractice(byId.get(id)));if(!ids.length){toast('当前范围内没有可练习的义项');return}practiceKind=kind;queue=[...ids];for(let i=queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[queue[i],queue[j]]=[queue[j],queue[i]]}qi=0;correct=0;currentOk=null;roundActive=true;$('quiz').showModal();question()}
-const MODEL_URL='https://caijiahangvip-sudo.github.io/vosk-letter-model/model.tar.gz';
+const MODEL_PARTS=['https://caijiahangvip-sudo.github.io/vosk-letter-model/model22.part-00','https://caijiahangvip-sudo.github.io/vosk-letter-model/model22.part-01'];
 const VOICE_DB='letter-voice';
 let redoUsed=false,voiceModel=null,voiceLoading=null,voiceSession=null;
 const letterNames=new Map(Object.entries({w:'w',double:'w',dub:'w',ay:'a',bee:'b',be:'b',cee:'c',see:'c',sea:'c',dee:'d',ee:'e',ef:'f',eff:'f',gee:'g',h:'h',ach:'h',eye:'i',jay:'j',kay:'k',el:'l',em:'m',en:'n',oh:'o',owe:'o',pee:'p',pea:'p',cue:'q',queue:'q',are:'r',ar:'r',ess:'s',tee:'t',tea:'t',you:'u',vee:'v',ex:'x',why:'y',wye:'y',zee:'z',zed:'z'}));
@@ -870,16 +870,22 @@ async function loadVoiceModel(){
   if(voiceModel)return voiceModel;
   if(voiceLoading)return voiceLoading;
   voiceLoading=(async()=>{
-    let blob=await dbGet('model');
+    let blob=await dbGet('model22');
     if(!blob){
-      setVoiceLabel('下载语音模型… 0%');
-      const res=await fetch(MODEL_URL);
-      if(!res.ok)throw new Error(`模型下载失败 HTTP ${res.status}`);
-      const total=+res.headers.get('content-length')||0;
-      const reader=res.body.getReader();const parts=[];let got=0;
-      for(;;){const {done,value}=await reader.read();if(done)break;parts.push(value);got+=value.length;if(total)setVoiceLabel(`下载语音模型… ${Math.floor(got/total*100)}%`)}
+      const parts=[];
+      for(let i=0;i<MODEL_PARTS.length;i++){
+        const res=await fetch(MODEL_PARTS[i]);
+        if(!res.ok)throw new Error(`模型下载失败 HTTP ${res.status}`);
+        const reader=res.body.getReader();let got=0;
+        for(;;){
+          const {done,value}=await reader.read();
+          if(done)break;
+          parts.push(value);got+=value.length;
+          setVoiceLabel(`下载语音模型 ${i+1}/${MODEL_PARTS.length}… ${(got/1048576).toFixed(0)} MB`);
+        }
+      }
       blob=new Blob(parts);
-      await dbPut('model',blob);
+      await dbPut('model22',blob);
     }
     setVoiceLabel('加载语音模型…');
     voiceModel=await Vosk.createModel(URL.createObjectURL(blob));
